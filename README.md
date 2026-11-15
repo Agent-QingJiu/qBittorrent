@@ -22,7 +22,7 @@
 | OpenSSL / zlib | 3.5.6 / 1.3.1 |
 | C/C++ 编译器 | GCC 13.4.0，以官方 DSM SDK 为 sysroot 构建 |
 
-官方 SDK 自带 GCC 4.9.3，Qt 6 和新版 qBittorrent 需要更新的 C++ 编译器。构建流程编译 GCC 13.4.0 和目标 C++ 运行库，仍使用群晖 SDK 的头文件、GLIBC 2.20 和系统 ABI。构建输入及 SHA256 见 [sources.lock](sources.lock)，图标来自同一个上游源码归档。许可证见 [COPYING](COPYING) 和 SPK 中的 `share/licenses/`。上游对应源码可由锁定文件中的官方地址获得。
+官方 SDK 自带 GCC 4.9.3，Qt 6 和新版 qBittorrent 需要更新的 C++ 编译器。构建流程编译 GCC 13.4.0 和目标 C++ 运行库，仍使用群晖 SDK 的头文件、GLIBC 2.20 和系统 ABI。构建输入及 SHA256 见 [sources.lock](sources.lock)，图标来自同一个上游源码归档。Qt 含针对 GLIBC 2.20 的[插件退出兼容补丁](ci/patches/qt-glibc220-plugin-shutdown.patch)，用于正常关闭 TLS 和 SQLite 插件。许可证见 [COPYING](COPYING) 和 SPK 中的 `share/licenses/`。上游对应源码可由锁定文件中的官方地址获得。
 
 ## 下载、校验、安装
 

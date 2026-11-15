@@ -14,7 +14,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-dist, sysroot = map(pathlib.Path, sys.argv[1:])
+dist, sysroot, qt_probe = map(pathlib.Path, sys.argv[1:])
 spk, = dist.glob("*.spk")
 target = "/volume1/@appstore/qBittorrent"
 store = "/volume1/@appdata/qBittorrent-native"
@@ -130,6 +130,11 @@ with tempfile.TemporaryDirectory(prefix="qb-dsm-test-") as temporary:
         mounted.append(root / "proc")
         unpack()
         in_root(target + "/bin/qbittorrent-nox", "--version")
+        probe = target + "/bin/qt-runtime-check"
+        shutil.copyfile(qt_probe, inside(probe))
+        inside(probe).chmod(0o755)
+        in_root(probe)
+        inside(probe).unlink()
         lifecycle("preinst")
         lifecycle("postinst")
         password_file = next(inside(store).glob("*.txt"))

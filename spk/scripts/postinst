@@ -30,7 +30,7 @@ account_password=$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')
 /usr/syno/sbin/synouser --add "$account" "$account_password" 'qBittorrent service' 0 '' 0
 account_created=yes
 id -u "$account" > "$staging/.managed"
-install -d -m 700 "$staging/Profile/qBittorrent/config" "$staging/Logs"
+install -d -m 700 "$staging/Profile" "$staging/Profile/qBittorrent/config" "$staging/Logs"
 printf '账号：admin（登录时输入 admin）\n密码：%s\n' "$password" > "$staging/初始登录.txt"
 rm "$staging/credential"
 cat > "$staging/Profile/qBittorrent/config/qBittorrent.conf" <<CONF

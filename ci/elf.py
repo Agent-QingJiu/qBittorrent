@@ -28,6 +28,9 @@ while pending:
     header = readelf("-hW", file)
     if "ELF64" not in header or "Advanced Micro Devices X86-64" not in header:
         raise SystemExit(f"不兼容的 ELF 架构：{file}")
+    properties = readelf("-nW", file)
+    if re.search(r"x86 ISA needed:.*x86-64-v[34]", properties):
+        raise SystemExit(f"ELF 要求 Sandy Bridge 不支持的指令集：{file}")
     interpreter = re.search(r"Requesting program interpreter: (.*?)\]", readelf("-lW", file))
     if interpreter and interpreter[1] != "/lib64/ld-linux-x86-64.so.2":
         raise SystemExit(f"不兼容的加载器：{file}: {interpreter[1]}")

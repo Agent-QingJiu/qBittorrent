@@ -1,0 +1,17 @@
+--- a/src/corelib/plugin/qlibrary_unix.cpp
++++ b/src/corelib/plugin/qlibrary_unix.cpp
+@@ -250,11 +250,8 @@
+ bool QLibraryPrivate::unload_sys()
+ {
+-    bool doTryUnload = true;
+-#ifndef RTLD_NODELETE
+-    if (loadHints() & QLibrary::PreventUnloadHint)
+-        doTryUnload = false;
+-#endif
+-    if (doTryUnload && dlclose(pHnd.loadAcquire())) {
++    // GLIBC 2.20 can assert during shutdown when a NODELETE plugin
++    // calls dlclose after the loader has finalized the plugin's dependencies.
++    if (!(loadHints() & QLibrary::PreventUnloadHint) && dlclose(pHnd.loadAcquire())) {
+         const char *error = dlerror();
+ #if defined (Q_OS_QNX)
+         // Workaround until fixed in QNX; fixes crash in
