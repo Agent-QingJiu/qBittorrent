@@ -1,1 +1,1 @@
-[{"step_title":"卸载 qBittorrent","items":[{"type":"textfield","desc":"卸载移除程序，保留配置、任务状态、专用账号和所有下载文件。再次安装后可继续使用现有配置及任务。","subitems":[]}]}]
+[{"step_title":"卸载 qBittorrent","items":[{"type":"multiselect","desc":"默认删除套件配置、任务记录、日志、初始凭据和专用账号。下载共享文件夹不会被删除。若将下载路径自定义到套件数据目录内，请先移出文件或勾选保留。","subitems":[{"key":"wizard_qbt_keep_config","desc":"保留配置、任务记录和专用账号，供重新安装时恢复","defaultValue":false}]}]}]

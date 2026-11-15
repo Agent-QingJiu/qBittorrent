@@ -135,15 +135,17 @@ with tempfile.TemporaryDirectory(prefix="qb-dsm-test-") as temporary:
     (root / "etc/nsswitch.conf").write_text("passwd: files\ngroup: files\nhosts: files\n")
     (root / "etc/hosts").write_text("127.0.0.1 localhost\n")
     (root / "usr/syno/sbin/synouser").write_text(
-        "#!/bin/sh\n[ \"$1\" = --add ] || exit 1\n"
+        "#!/bin/sh\n"
+        "if [ \"$1\" = --del ]; then sed -i \"/^$2:/d\" /etc/passwd; exit; fi\n"
+        "[ \"$1\" = --add ] || exit 1\n"
         "printf '%s:x:19081:100:qBittorrent:/nonexistent:/bin/false\\n' \"$2\" >> /etc/passwd\n")
     (root / "usr/syno/sbin/synouser").chmod(0o755)
 
     mounted = []
+    def lifecycle(name, *args, **env):
+        subprocess.run(["chroot", root, scripts + name, *args], check=True, env={**os.environ, **env})
     def in_root(*args):
         run("chroot", root, *args)
-    def lifecycle(name, *args):
-        in_root(scripts + name, *args)
     seeder = None
     tracker = None
     try:
@@ -268,7 +270,7 @@ with tempfile.TemporaryDirectory(prefix="qb-dsm-test-") as temporary:
         client.login(password)
         assert {torrent_hash, magnet_hash} <= client.torrents().keys()
         lifecycle("preuninst")
-        lifecycle("postuninst")
+        lifecycle("postuninst", SYNOPKG_PKG_STATUS="UNINSTALL", wizard_qbt_keep_config="true")
         original = inside(config).read_bytes()
         shutil.rmtree(inside(target))
         lifecycle("preinst")
@@ -282,6 +284,15 @@ with tempfile.TemporaryDirectory(prefix="qb-dsm-test-") as temporary:
         lifecycle("start-stop-status", "restart")
         client.login(password)
         assert {torrent_hash, magnet_hash} <= client.torrents().keys()
+        lifecycle("preuninst")
+        built_in = inside(profile + "/downloads")
+        built_in.mkdir(exist_ok=True)
+        (built_in / "保留.bin").write_bytes(content)
+        lifecycle("postuninst", SYNOPKG_PKG_STATUS="UNINSTALL")
+        assert not inside(store).exists()
+        assert "qbittorrentspk:" not in inside("/etc/passwd").read_text()
+        assert next(inside("/volume1/@appdata").glob("qBittorrent-downloads.*/downloads/保留.bin")).read_bytes() == content
+        assert (inside(paths[2]) / "校验 文件.bin").read_bytes() == content
         print("通过 DSM GLIBC 2.20、网页认证、本地种子和磁力传输、自选路径及模拟生命周期测试。")
     finally:
         if tracker is not None:

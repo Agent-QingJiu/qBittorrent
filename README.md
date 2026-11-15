@@ -6,7 +6,7 @@
 
 [最新正式版本及 SPK 下载](https://github.com/Agent-QingJiu/qBittorrent/releases/latest) · [构建记录](https://github.com/Agent-QingJiu/qBittorrent/actions/workflows/build.yml) · [套件构建源码](https://github.com/Agent-QingJiu/qBittorrent) · [qBittorrent 官方项目](https://www.qbittorrent.org/)
 
-当前源码套件版本为 **5.2.4-0002**，对应[上游 qBittorrent 5.2.4](https://github.com/qbittorrent/qBittorrent/tree/a1e4649cb8ae581925acc161dbab5cbc6584c542)。首次正式发布后的版本号与附件由上方下载入口显示。
+当前源码套件版本为 **5.2.4-0003**，对应[上游 qBittorrent 5.2.4](https://github.com/qbittorrent/qBittorrent/tree/a1e4649cb8ae581925acc161dbab5cbc6584c542)。首次正式发布后的版本号与附件由上方下载入口显示。
 
 ## 支持平台与依赖
 
@@ -27,7 +27,7 @@
 ## 下载、校验、安装
 
 1. 从正式发布页面下载对应架构的 `.spk` 和 `SHA256SUMS`。保持文件名一致并放到同一目录。
-2. Linux 或 macOS 执行 `shasum -a 256 -c SHA256SUMS`。Windows PowerShell 执行 `Get-FileHash .\qBittorrent-5.2.4-0002-DSM6.2.3-bromolow.spk -Algorithm SHA256`，与该版本的 `SHA256SUMS` 对照。
+2. Linux 或 macOS 执行 `shasum -a 256 -c SHA256SUMS`。Windows PowerShell 执行 `Get-FileHash .\qBittorrent-5.2.4-0003-DSM6.2.3-bromolow.spk -Algorithm SHA256`，与该版本的 `SHA256SUMS` 对照。
 3. 登录 DSM，打开「套件中心 → 手动安装」，选择 SPK。安装卷选择 **volume1**。如果 DSM 拒绝未签名套件，在套件中心核对信任级别后允许手动安装。
 4. 在套件中心启动服务。局域网浏览器访问 `http://NAS的局域网地址:8080/`。Web UI 使用官方简体中文翻译。允许局域网访问所用的管理端口，避免将管理端口直接映射到公网。
 
@@ -62,7 +62,7 @@ sudo cat /volume1/@appdata/qBittorrent-native/初始登录.txt
 | 进程日志 | `/volume1/@appdata/qBittorrent-native/Logs/console.log` |
 | 下载文件 | Web UI 中选定的共享目录或当前配置的默认目录 |
 
-套件中心可启动、停止、重启和查看日志。启用服务后由 DSM 管理开机启动。更新前可先在套件中心停止服务，再备份持久化根目录。覆盖安装新 SPK 后启动，核对任务和目录设置。卸载保留持久化目录、服务账号及下载文件。再次安装到 volume1 后，按原用户名和密码登录即可使用已有配置和任务。
+套件中心可启动、停止、重启和查看日志。启用服务后由 DSM 管理开机启动。更新前可先在套件中心停止服务，再备份持久化根目录。覆盖安装新 SPK 后启动，核对任务和目录设置。卸载默认删除配置、任务记录、日志、初始凭据和专用账号。勾选「保留配置、任务记录和专用账号」后，重新安装到 volume1 可以继续使用原配置和任务。共享文件夹及其中的下载文件会保留。若使用套件内置默认下载目录，卸载时会将其移到 `/volume1/@appdata/qBittorrent-downloads.*` 下。若将下载路径自行设在套件数据目录内的其他位置，请先迁移文件或勾选保留。
 
 如需将数据备份恢复到同一台 NAS，先停止套件，恢复持久化目录及原有所有权与权限，再启动。迁移到其他 NAS 时，服务账号的用户 ID 和共享目录 ACL 需要管理员核对，软件默认拒绝接管归属不匹配的持久化目录。
 
@@ -82,4 +82,4 @@ sudo cat /volume1/@appdata/qBittorrent-native/初始登录.txt
 
 ### 安装时授权共享文件夹
 
-安装向导默认勾选列出的普通本地共享文件夹，可取消任意一项，也可以取消应用整页设置。勾选表示允许专用账号读、写和删除相应目录中的文件。填写新共享文件夹的名称可在 volume1 创建并授权。新建后仍可在 Web UI 中自由选择下载目录。升级和重装保留现有权限，可在 DSM 控制面板撤销。
+安装向导默认勾选列出的普通本地共享文件夹，可取消任意一项，也可以取消应用整页设置。勾选表示允许专用账号读、写和删除相应目录中的文件。填写新共享文件夹的名称可在 volume1 创建并授权。新建后仍可在 Web UI 中自由选择下载目录。升级及勾选保留后的重装沿用原账号及权限，可在 DSM 控制面板撤销。

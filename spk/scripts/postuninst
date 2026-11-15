@@ -1,3 +1,24 @@
 #!/bin/sh
-# 永久保留配置、任务、服务账号以及用户选择的下载目录。
-exit 0
+. "$(dirname "$0")/common"
+
+[ "${SYNOPKG_PKG_STATUS:-}" = UNINSTALL ] || exit 0
+case "${wizard_qbt_keep_config:-false}" in true|1|on) exit 0 ;; esac
+[ -e "$store" ] || [ -L "$store" ] || exit 0
+managed_store || fail "无法确认套件数据目录归属，已跳过清理。"
+if live_pid; then
+    fail "qBittorrent 仍在运行。"
+fi
+if awk -v root="$store" '$2 == root || index($2, root "/") == 1 { found=1 } END { exit !found }' /proc/mounts; then
+    fail "套件数据目录下有挂载点，已跳过清理。"
+fi
+
+downloads=$profile/qBittorrent/downloads
+if [ ! -L "$profile" ] && [ ! -L "$profile/qBittorrent" ] &&
+   { [ -e "$downloads" ] || [ -L "$downloads" ]; }; then
+    backup=$(mktemp -d "$parent/qBittorrent-downloads.XXXXXX")
+    mv "$downloads" "$backup/" || fail "无法保留套件默认下载目录，已跳过清理。"
+    printf '已保留默认下载目录：%s/downloads\n' "$backup"
+fi
+rm -rf -- "$store"
+[ ! -e "$store" ] || fail "套件数据目录清理失败。"
+/usr/syno/sbin/synouser --del "$account"
