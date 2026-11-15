@@ -1,14 +1,18 @@
 """在 Synology GLIBC 2.20 根目录中测试最终 SPK，模拟 DSM 套件中心调用。"""
 import hashlib
 import http.cookiejar
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 import pathlib
 import shutil
+import socket
+import struct
 import subprocess
 import sys
 import tarfile
 import tempfile
+from threading import Thread
 import time
 import urllib.error
 import urllib.parse
@@ -78,6 +82,26 @@ class Client:
     def preferences(self, **changes):
         return self.request("/api/v2/app/setPreferences", {"json": json.dumps(changes)})
 
+class TestTracker(BaseHTTPRequestHandler):
+    def do_GET(self):
+        url = urllib.parse.urlsplit(self.path)
+        params = urllib.parse.parse_qs(url.query)
+        if url.path != "/announce" or "info_hash" not in params:
+            self.send_error(400)
+            return
+        seeder = socket.inet_aton("127.0.0.1") + struct.pack("!H", 16881)
+        peers = b"" if params.get("port") == ["16881"] else seeder
+        body = bencode({b"interval": 5, b"complete": 1, b"incomplete": 0, b"peers": peers})
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, _format, *_args):
+        print("本地 Tracker 收到请求", flush=True)
+
+
 with tempfile.TemporaryDirectory(prefix="qb-dsm-test-") as temporary:
     root = pathlib.Path(temporary)
     root.chmod(0o755)
@@ -121,6 +145,7 @@ with tempfile.TemporaryDirectory(prefix="qb-dsm-test-") as temporary:
     def lifecycle(name, *args):
         in_root(scripts + name, *args)
     seeder = None
+    tracker = None
     try:
         for device in ("null", "urandom", "random"):
             source = "/dev/" + device
@@ -208,19 +233,25 @@ with tempfile.TemporaryDirectory(prefix="qb-dsm-test-") as temporary:
         wait_for(lambda: client.torrents().get(torrent_hash, {}).get("progress") == 1)
         assert (inside(paths[2]) / "校验 文件.bin").read_bytes() == content
 
-        magnet_hash, _ = create_torrent("磁力 文件.bin", content)
-        magnet = f"magnet:?xt=urn:btih:{magnet_hash}&x.pe=127.0.0.1:16881"
+        magnet_content = b"qBittorrent magnet fixture\n" * 6000
+        magnet_hash, _ = create_torrent("磁力 文件.bin", magnet_content)
+        tracker = ThreadingHTTPServer(("127.0.0.1", 0), TestTracker)
+        Thread(target=tracker.serve_forever, daemon=True).start()
+        tracker_url = f"http://127.0.0.1:{tracker.server_port}/announce"
+        magnet = f"magnet:?xt=urn:btih:{magnet_hash}&" + urllib.parse.urlencode({"tr": tracker_url})
         client.request("/api/v2/torrents/add", {"urls": magnet, "autoTMM": "false", "stopped": "false"})
         try:
             wait_for(lambda: client.torrents().get(magnet_hash, {}).get("progress") == 1)
         except AssertionError:
+            print("磁力 Tracker 状态", client.request(
+                "/api/v2/torrents/trackers?hash=" + magnet_hash).decode(), flush=True)
             for role, peer in (("下载端", client), ("做种端", seed)):
                 torrent_status = peer.torrents().get(magnet_hash, {})
                 keys = ("name", "state", "progress", "amount_left", "num_seeds", "num_leechs",
                         "save_path", "content_path")
                 print(role, {key: torrent_status.get(key) for key in keys}, flush=True)
             raise
-        assert (inside(paths[0]) / "磁力 文件.bin").read_bytes() == content
+        assert (inside(paths[0]) / "磁力 文件.bin").read_bytes() == magnet_content
 
         lifecycle("preupgrade")
         original = inside(config).read_bytes()
@@ -249,6 +280,9 @@ with tempfile.TemporaryDirectory(prefix="qb-dsm-test-") as temporary:
         assert {torrent_hash, magnet_hash} <= client.torrents().keys()
         print("通过 DSM GLIBC 2.20、网页认证、本地种子和磁力传输、自选路径及模拟生命周期测试。")
     finally:
+        if tracker is not None:
+            tracker.shutdown()
+            tracker.server_close()
         for path in (store + "/Logs/console.log", profile + "/data/logs/qbittorrent.log",
                      "/volume1/seeder/log", "/volume1/seeder/qBittorrent/data/logs/qbittorrent.log"):
             if inside(path).is_file():
