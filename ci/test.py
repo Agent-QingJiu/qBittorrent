@@ -194,6 +194,8 @@ with tempfile.TemporaryDirectory(prefix="qb-dsm-test-") as temporary:
             assert torrent_hash in json.loads(result)["added_torrent_ids"]
             wait_for(lambda: seed.torrents().get(torrent_hash, {}).get("progress") == 1)
             seed.request("/api/v2/torrents/recheck", {"hashes": torrent_hash})
+            wait_for(lambda: seed.torrents().get(torrent_hash, {}).get("state")
+                     in {"uploading", "stalledUP", "queuedUP", "forcedUP"})
             return torrent_hash, torrent
 
         content = b"qBittorrent integration data\n" * 6000
@@ -207,11 +209,17 @@ with tempfile.TemporaryDirectory(prefix="qb-dsm-test-") as temporary:
         assert (inside(paths[2]) / "校验 文件.bin").read_bytes() == content
 
         magnet_hash, _ = create_torrent("磁力 文件.bin", content)
-        client.request("/api/v2/torrents/add", {"urls": f"magnet:?xt=urn:btih:{magnet_hash}",
-                       "autoTMM": "false"})
-        wait_for(lambda: magnet_hash in client.torrents())
-        client.request("/api/v2/torrents/addPeers", {"hashes": magnet_hash, "peers": "127.0.0.1:16881"})
-        wait_for(lambda: client.torrents().get(magnet_hash, {}).get("progress") == 1)
+        magnet = f"magnet:?xt=urn:btih:{magnet_hash}&x.pe=127.0.0.1:16881"
+        client.request("/api/v2/torrents/add", {"urls": magnet, "autoTMM": "false", "stopped": "false"})
+        try:
+            wait_for(lambda: client.torrents().get(magnet_hash, {}).get("progress") == 1)
+        except AssertionError:
+            for role, peer in (("下载端", client), ("做种端", seed)):
+                torrent_status = peer.torrents().get(magnet_hash, {})
+                keys = ("name", "state", "progress", "amount_left", "num_seeds", "num_leechs",
+                        "save_path", "content_path")
+                print(role, {key: torrent_status.get(key) for key in keys}, flush=True)
+            raise
         assert (inside(paths[0]) / "磁力 文件.bin").read_bytes() == content
 
         lifecycle("preupgrade")
@@ -241,7 +249,8 @@ with tempfile.TemporaryDirectory(prefix="qb-dsm-test-") as temporary:
         assert {torrent_hash, magnet_hash} <= client.torrents().keys()
         print("通过 DSM GLIBC 2.20、网页认证、本地种子和磁力传输、自选路径及模拟生命周期测试。")
     finally:
-        for path in (store + "/Logs/console.log", "/volume1/seeder/log"):
+        for path in (store + "/Logs/console.log", profile + "/data/logs/qbittorrent.log",
+                     "/volume1/seeder/log", "/volume1/seeder/qBittorrent/data/logs/qbittorrent.log"):
             if inside(path).is_file():
                 print(inside(path).read_text(errors="replace"))
         if inside(store + "/service.pid").is_file() and mounted:
