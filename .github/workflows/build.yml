@@ -1,0 +1,73 @@
+name: 构建群晖 DSM 6.2.3 套件
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'ci/**'
+      - 'spk/**'
+      - 'sources.lock'
+  pull_request:
+    paths:
+      - 'ci/**'
+      - 'spk/**'
+      - 'sources.lock'
+      - '.github/workflows/build.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qbittorrent-spk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: 源码编译、打包与测试
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: 构建与验证 Bromolow 套件
+        run: |
+          mkdir -p dist
+          bash ci/build 2>&1 | tee dist/build.log
+        shell: bash
+      - name: 保留构建日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 构建日志
+          path: dist/*.log
+          retention-days: 90
+      - name: 上传通过验证的套件
+        uses: actions/upload-artifact@v4
+        with:
+          name: bromolow-spk
+          path: |
+            dist/*.spk
+            dist/SHA256SUMS
+            dist/ELF-dependencies.txt
+          if-no-files-found: error
+  release:
+    name: 发布正式版本
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: bromolow-spk
+          path: dist
+      - name: 校验并发布
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash ci/release
