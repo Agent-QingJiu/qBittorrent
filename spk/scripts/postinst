@@ -1,5 +1,6 @@
 #!/bin/sh
 . "$(dirname "$0")/common"
+. "$(dirname "$0")/shares"
 check_target
 if [ -e "$store" ] || [ -L "$store" ]; then
     check_store
@@ -56,3 +57,4 @@ chmod 755 "$staging"
 mv -T "$staging" "$store"
 staging=
 check_store
+apply_share_choices

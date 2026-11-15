@@ -8,7 +8,12 @@ name="qBittorrent-$version-DSM6.2.3-bromolow.spk"
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
 cp -r spk/{INFO,scripts,conf,WIZARD_UIFILES} "$stage/"
-chmod 755 "$stage"/scripts/*
+{
+    printf '#!/bin/sh\n'
+    cat spk/scripts/shares spk/share-wizard
+} > "$stage/WIZARD_UIFILES/install_uifile.sh"
+chmod 755 "$stage"/scripts/* "$stage/WIZARD_UIFILES/install_uifile.sh"
+sh -n "$stage/WIZARD_UIFILES/install_uifile.sh"
 for script in "$stage"/scripts/*; do
     sh -n "$script"
 done

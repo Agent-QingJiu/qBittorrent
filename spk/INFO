@@ -1,5 +1,5 @@
 package="qBittorrent"
-version="5.2.4-0001"
+version="5.2.4-0002"
 displayname="qBittorrent"
 arch="bromolow"
 description="基于 qBittorrent 官方源码构建的群晖原生套件，提供简体中文网页管理、磁力链接、种子下载和做种。卸载时保留配置、任务及下载文件。"

@@ -1,0 +1,15 @@
+# 打包时附在 shares 函数之后。
+json_label() {
+    # 共享名称可能包含引号。尖括号等在 DSM 的 HTML 标签中需要转义。
+    printf '%s' "$1" | sed 's/\&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\\"/g'
+}
+
+generate_wizard() {
+    printf '%s' '[{"step_title":"安装 qBittorrent","items":[{"type":"textfield","desc":"安装卷请选择 volume1。通过 NAS 的 8080 端口打开网页。管理员可通过 SSH 读取 /volume1/@appdata/qBittorrent-native/初始登录.txt 获取初始凭据。","subitems":[]}]},{"step_title":"授权共享文件夹","items":['
+    printf '%s' '{"type":"multiselect","desc":"勾选后专用账号可读写对应共享文件夹（包括删除文件）。取消勾选可跳过授权。","subitems":[{"key":"wizard_qbt_share_choices","desc":"应用本页授权及新建设置","defaultValue":true}'
+    local_shares | while IFS= read -r share; do
+        printf ',{"key":"%s","desc":"%s","defaultValue":true}' "$(share_key "$share")" "$(json_label "$share")"
+    done
+    printf '%s\n' ']},{"type":"textfield","desc":"可选：在 volume1 新建一个共享文件夹并授予读写权限。之后可在 Web UI 中选择该路径。","subitems":[{"key":"wizard_qbt_new_share","desc":"新共享文件夹名称","emptyText":"例如 qBittorrent-Downloads","validator":{"allowBlank":true,"maxLength":32,"regex":{"expr":"/^[A-Za-z0-9][A-Za-z0-9_.-]*$/","errorText":"请以字母或数字开头，只使用字母、数字、点、下划线及连字符。"}}}]}]}]'
+}
+generate_wizard > "${SYNOPKG_TEMP_LOGFILE:?}"

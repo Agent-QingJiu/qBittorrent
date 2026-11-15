@@ -1,0 +1,60 @@
+# 由安装向导和生命周期脚本共用。
+synoshare=/usr/syno/sbin/synoshare
+
+share_key() {
+    printf 'wizard_qbt_share_'
+    printf '%s' "$1" | od -An -tx1 | tr -d ' \n'
+}
+
+local_shares() {
+    [ -x "$synoshare" ] || return 0
+    LC_ALL=C "$synoshare" --enum LOCAL 2>/dev/null | while IFS= read -r share; do
+        case "$share" in ''|[-@.]*|*/*|*\\*) continue ;; esac
+        [ "$share" = "$(printf '%s' "$share" | LC_ALL=C tr -d '[:cntrl:]')" ] || continue
+        case "$(printf '%s' "$share" | tr 'A-Z' 'a-z')" in
+            home|homes|global|printers|netbackup|activebackupforbusiness|surveillance) continue ;;
+        esac
+        if LC_ALL=C "$synoshare" --get "$share" >/dev/null 2>&1; then
+            printf '%s\n' "$share"
+        fi
+    done
+}
+
+share_warning() {
+    printf '%s\n' "$*" >&2
+    if [ -n "${SYNOPKG_TEMP_LOGFILE:-}" ]; then
+        printf '%s\n' "$*" >> "$SYNOPKG_TEMP_LOGFILE"
+    fi
+}
+
+apply_share_choices() {
+    [ "${wizard_qbt_share_choices:-}" = true ] || return 0
+    local_shares | while IFS= read -r share; do
+        [ "$(printenv "$(share_key "$share")" 2>/dev/null)" = true ] || continue
+        "$synoshare" --setuser "$share" RW + "$account" >/dev/null ||
+            share_warning "无法授予共享文件夹 $share 的读写权限，请在 DSM 控制面板核对。"
+    done
+    new_share=${wizard_qbt_new_share:-}
+    [ -n "$new_share" ] || return 0
+    case "$new_share" in
+        [!A-Za-z0-9]*|*[!A-Za-z0-9_.-]*)
+            share_warning "新增共享文件夹名称须以字母或数字开头，只能包含字母、数字、点、下划线或连字符。"
+            return 0 ;;
+    esac
+    case "$(printf '%s' "$new_share" | tr 'A-Z' 'a-z')" in
+        home|homes|global|printers|netbackup|activebackupforbusiness|surveillance)
+            share_warning "这个名称为 DSM 保留，请另选名称。"
+            return 0 ;;
+    esac
+    if [ "${#new_share}" -gt 32 ]; then
+        share_warning "新增共享文件夹名称最多 32 个字符。"
+        return 0
+    fi
+    if "$synoshare" --get "$new_share" >/dev/null 2>&1 ||
+       [ -e "/volume1/$new_share" ] || [ -L "/volume1/$new_share" ]; then
+        share_warning "共享文件夹或路径已存在，未创建 $new_share。"
+        return 0
+    fi
+    "$synoshare" --add "$new_share" 'qBittorrent 下载目录' "/volume1/$new_share" '' "$account" '' 1 0 >/dev/null ||
+        share_warning "无法在 volume1 创建共享文件夹 $new_share，请在 DSM 控制面板检查。"
+}

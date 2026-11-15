@@ -1,1 +1,0 @@
-[{"step_title":"安装 qBittorrent","items":[{"type":"textfield","desc":"安装卷请选择 volume1。使用 NAS 的 8080 端口打开网页。管理员可通过 SSH 读取 /volume1/@appdata/qBittorrent-native/初始登录.txt 获取初始账号和密码。下载目录可在网页中自选。","subitems":[]}]}]
