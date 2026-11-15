@@ -53,7 +53,10 @@ int main(int argc, char **argv)
         goto error;
     if (log > STDERR_FILENO)
         close(log);
-    execl(argv[5], argv[5], "--profile", argv[3], (char *)NULL);
+    char *option = NULL;
+    if (asprintf(&option, "--profile=%s", argv[3]) < 0)
+        goto error;
+    execl(argv[5], argv[5], option, (char *)NULL);
 error:
     perror("qbt-service");
     return 1;

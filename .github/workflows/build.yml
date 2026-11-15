@@ -30,7 +30,7 @@ permissions:
 
 concurrency:
   group: qbittorrent-spk-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -42,11 +42,30 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: 恢复已编译的 GCC
+        id: compiler-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/qbittorrent-bromolow/compiler
+          key: bromolow-gcc13.4.0-ubuntu24-1-${{ hashFiles('sources.lock') }}
       - name: 构建与验证 Bromolow 套件
         run: |
           mkdir -p dist
           bash ci/build 2>&1 | tee dist/build.log
         shell: bash
+      - name: 检查 GCC 缓存状态
+        if: always()
+        id: compiler-status
+        run: |
+          if [[ -f "$RUNNER_TEMP/qbittorrent-bromolow/compiler/.complete" ]]; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: 缓存已完成的 GCC 构建
+        if: always() && steps.compiler-cache.outputs.cache-hit != 'true' && steps.compiler-status.outputs.ready == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/qbittorrent-bromolow/compiler
+          key: ${{ steps.compiler-cache.outputs.cache-primary-key }}
       - name: 保留构建日志
         if: always()
         uses: actions/upload-artifact@v4

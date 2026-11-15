@@ -79,6 +79,7 @@ class Client:
 
 with tempfile.TemporaryDirectory(prefix="qb-dsm-test-") as temporary:
     root = pathlib.Path(temporary)
+    root.chmod(0o755)
     def inside(path):
         return root / path.lstrip("/")
     required = {"INFO", "package.tgz", "scripts", "conf", "WIZARD_UIFILES",

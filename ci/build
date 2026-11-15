@@ -45,7 +45,7 @@ for entry in qb52:qbittorrent lt2:libtorrent boost:boost qt6base:qtbase qt6tools
 done
 
 # DSM 工具链提供目标 glibc 和系统头文件。现代 GCC 为同一 sysroot 构建 C++ 运行库。
-if [[ ! -x "$work/compiler/bin/$target-g++" ]]; then
+if [[ ! -f "$work/compiler/.complete" ]]; then
     (
         cd "$work/compiler-build"
         "$work/src/gcc/configure" --prefix="$work/compiler" --target="$target" \
@@ -56,6 +56,7 @@ if [[ ! -x "$work/compiler/bin/$target-g++" ]]; then
             --disable-libquadmath --disable-libvtv --disable-libstdcxx-pch
         make -j"$jobs" all-gcc all-target-libgcc all-target-libstdc++-v3
         make install-gcc install-target-libgcc install-target-libstdc++-v3
+        touch "$work/compiler/.complete"
     )
 fi
 
@@ -116,6 +117,9 @@ printf '[Paths]\nPrefix=..\nPlugins=plugins\n' > "$payload/bin/qt.conf"
 install -m 644 "$project/sources.lock" "$payload/share/"
 cmp "$project/assets/qbittorrent.svg" "$work/src/qbittorrent/dist/unix/menuicons/scalable/apps/qbittorrent.svg"
 install -m 644 "$work/src/qbittorrent/COPYING" "$payload/share/licenses/qBittorrent"
+install -m 644 "$work/src/qbittorrent/COPYING.GPLv2" "$payload/share/licenses/qBittorrent-GPLv2"
+install -m 644 "$work/src/qbittorrent/COPYING.GPLv3" "$payload/share/licenses/qBittorrent-GPLv3"
+install -m 644 "$work/src/qbittorrent/AUTHORS" "$payload/share/licenses/qBittorrent-AUTHORS"
 install -m 644 "$work/src/libtorrent/COPYING" "$payload/share/licenses/libtorrent"
 install -m 644 "$work/src/boost/LICENSE_1_0.txt" "$payload/share/licenses/Boost"
 install -m 644 "$work/src/openssl/LICENSE.txt" "$payload/share/licenses/OpenSSL"
