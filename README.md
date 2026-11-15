@@ -4,7 +4,7 @@
 
 面向群晖 DS3615xs-j、DSM 6.2.3-25426 和 Bromolow（x86_64）的 qBittorrent-nox 套件。安装后使用官方 Web UI 管理磁力和 Torrent 下载、做种、分类、标签、Tracker、RSS、连接数和传输限速。
 
-[最新正式版本及 SPK 下载](https://github.com/Agent-QingJiu/qBittorrent/releases/latest) · [构建记录](https://github.com/Agent-QingJiu/qBittorrent/actions/workflows/build.yml) · [套件构建源码](https://github.com/Agent-QingJiu/qBittorrent) · [qBittorrent 官方项目](https://www.qbittorrent.org/)
+[最新正式版本及 SPK 下载](https://github.com/QiStore/qBittorrent/releases/latest) · [构建记录](https://github.com/QiStore/qBittorrent/actions/workflows/build.yml) · [套件构建源码](https://github.com/QiStore/qBittorrent) · [qBittorrent 官方项目](https://www.qbittorrent.org/)
 
 当前源码套件版本为 **5.2.4-0003**，对应[上游 qBittorrent 5.2.4](https://github.com/qbittorrent/qBittorrent/tree/a1e4649cb8ae581925acc161dbab5cbc6584c542)。首次正式发布后的版本号与附件由上方下载入口显示。
 
