@@ -69,7 +69,8 @@ class Client:
             return response.read()
 
     def login(self, password):
-        assert b"Ok." == self.request("/api/v2/auth/login", {"username": "admin", "password": password})
+        self.request("/api/v2/auth/login", {"username": "admin", "password": password})
+        assert self.request("/api/v2/app/version") == b"v5.2.4"
 
     def torrents(self):
         return {item["hash"]: item for item in json.loads(self.request("/api/v2/torrents/info"))}
@@ -188,8 +189,9 @@ with tempfile.TemporaryDirectory(prefix="qb-dsm-test-") as temporary:
             file.write_bytes(data)
             os.chown(file, 19081, 100)
             torrent = bencode({b"info": info})
-            assert seed.request("/api/v2/torrents/add", {"savepath": paths[3], "autoTMM": "false"},
-                                {"torrents": torrent}) == b"Ok."
+            result = seed.request("/api/v2/torrents/add", {"savepath": paths[3], "autoTMM": "false"},
+                                  {"torrents": torrent})
+            assert torrent_hash in json.loads(result)["added_torrent_ids"]
             wait_for(lambda: seed.torrents().get(torrent_hash, {}).get("progress") == 1)
             seed.request("/api/v2/torrents/recheck", {"hashes": torrent_hash})
             return torrent_hash, torrent
