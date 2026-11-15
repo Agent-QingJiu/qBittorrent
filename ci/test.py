@@ -103,7 +103,7 @@ with tempfile.TemporaryDirectory(prefix="qb-dsm-test-") as temporary:
     (root / "tmp").chmod(0o1777)
     shutil.copyfile(shutil.which("busybox"), root / "bin/busybox")
     (root / "bin/busybox").chmod(0o755)
-    for command in ("sh", "awk", "cat", "chown", "chmod", "dirname", "head", "id", "install", "mkdir",
+    for command in ("sh", "awk", "cat", "chown", "chmod", "dirname", "head", "id", "mkdir",
                     "mktemp", "mv", "od", "readlink", "rm", "sed", "sleep", "stat", "tr"):
         (root / "bin" / command).symlink_to("busybox")
     (root / "etc/passwd").write_text("root:x:0:0:root:/root:/bin/sh\n")
