@@ -1,0 +1,24 @@
+#!/bin/bash
+set -euo pipefail
+payload=$(realpath "$1")
+dist=$(realpath "$2")
+version=$(sed -n 's/^version="\([^"]*\)"$/\1/p' spk/INFO)
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[0-9]+$ ]]
+name="qBittorrent-$version-DSM6.2.3-bromolow.spk"
+stage=$(mktemp -d)
+trap 'rm -rf "$stage"' EXIT
+cp -r spk/{INFO,scripts,conf,WIZARD_UIFILES} "$stage/"
+chmod 755 "$stage"/scripts/*
+for script in "$stage"/scripts/*; do
+    sh -n "$script"
+done
+rsvg-convert -w 72 -h 72 -a assets/qbittorrent.svg -o "$stage/PACKAGE_ICON.PNG"
+rsvg-convert -w 256 -h 256 -a assets/qbittorrent.svg -o "$stage/PACKAGE_ICON_256.PNG"
+tar --owner=0 --group=0 -czf "$stage/package.tgz" -C "$payload" .
+tar --owner=0 --group=0 -cf "$dist/$name" -C "$stage" \
+    INFO package.tgz scripts conf WIZARD_UIFILES PACKAGE_ICON.PNG PACKAGE_ICON_256.PNG
+(
+    cd "$dist"
+    sha256sum "$name" > SHA256SUMS
+    sha256sum -c SHA256SUMS
+)

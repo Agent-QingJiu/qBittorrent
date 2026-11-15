@@ -1,0 +1,6 @@
+#!/bin/sh
+. "$(dirname "$0")/common"
+check_target
+if [ -e "$store" ] || [ -L "$store" ]; then
+    check_store
+fi

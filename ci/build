@@ -1,0 +1,131 @@
+#!/bin/bash
+set -euo pipefail
+project=$(cd "$(dirname "$0")/.." && pwd)
+cd "$project"
+work=${QBT_BUILD_DIR:-${RUNNER_TEMP:-/tmp}/qbittorrent-bromolow}
+mkdir -p "$work"/{archives,src,sdk,compiler-build,prefix,payload} dist
+work=$(realpath "$work")
+dist=$PWD/dist
+jobs=${QBT_JOBS:-$(nproc)}
+if [[ -n ${GITHUB_ACTIONS:-} ]]; then
+    sudo apt-get update
+    sudo apt-get install -y --no-install-recommends \
+        ninja-build libgmp-dev libmpfr-dev libmpc-dev flex bison \
+        pkg-config patchelf librsvg2-bin busybox-static
+fi
+while read -r sha file url; do
+    [[ "$sha" == \#* || -z "$sha" ]] && continue
+    archive=$work/archives/$file
+    if [[ ! -f "$archive" ]]; then
+        if ! curl -fLsS --retry 4 --retry-all-errors --connect-timeout 25 --max-time 600 "$url" -o "$archive.tmp"; then
+            [[ "$file" == env.txz ]] || exit 1
+            curl -fLsS --retry 4 --retry-all-errors --connect-timeout 25 --max-time 600 \
+                "${url/global.download.synology.com/global.synologydownload.com}" -o "$archive.tmp"
+        fi
+        mv "$archive.tmp" "$archive"
+    fi
+    printf '%s  %s\n' "$sha" "$archive" | sha256sum -c -
+done < sources.lock
+
+target=x86_64-pc-linux-gnu
+[[ -d "$work/sdk/usr/local/$target" ]] ||
+    tar -xf "$work/archives/env.txz" --no-same-owner -C "$work/sdk" "usr/local/$target"
+official="$work/sdk/usr/local/$target"
+sysroot="$official/$target/sys-root"
+"$official/bin/$target-gcc" --version
+for entry in qb52:qbittorrent lt2:libtorrent boost:boost qt6base:qtbase qt6tools:qttools ssl3:openssl zlib:zlib gcc:gcc; do
+    archive_name=${entry%:*}
+    source_dir=$work/src/${entry#*:}
+    if [[ ! -e "$source_dir/.complete" ]]; then
+        mkdir -p "$source_dir"
+        matches=("$work/archives/$archive_name".tar.*)
+        tar -xf "${matches[0]}" --no-same-owner -C "$source_dir" --strip-components=1
+        touch "$source_dir/.complete"
+    fi
+done
+
+# DSM 工具链提供目标 glibc 和系统头文件。现代 GCC 为同一 sysroot 构建 C++ 运行库。
+if [[ ! -x "$work/compiler/bin/$target-g++" ]]; then
+    (
+        cd "$work/compiler-build"
+        "$work/src/gcc/configure" --prefix="$work/compiler" --target="$target" \
+            --with-sysroot="$sysroot" --with-gnu-as --with-gnu-ld \
+            --with-as=/usr/bin/as --with-ld=/usr/bin/ld \
+            --enable-languages=c,c++ --disable-bootstrap --disable-multilib \
+            --disable-nls --disable-libsanitizer --disable-libssp --disable-libgomp \
+            --disable-libquadmath --disable-libvtv --disable-libstdcxx-pch
+        make -j"$jobs" all-gcc all-target-libgcc all-target-libstdc++-v3
+        make install-gcc install-target-libgcc install-target-libstdc++-v3
+    )
+fi
+
+export CC="$work/compiler/bin/$target-gcc" CXX="$work/compiler/bin/$target-g++"
+export CFLAGS='-O2 -march=x86-64 -mtune=sandybridge'
+export CXXFLAGS="$CFLAGS"
+export AR=/usr/bin/ar RANLIB=/usr/bin/ranlib
+prefix=$work/prefix
+export PKG_CONFIG_LIBDIR="$prefix/lib/pkgconfig:$prefix/lib64/pkgconfig"
+unset PKG_CONFIG_PATH
+export LD_LIBRARY_PATH="$prefix/lib:$prefix/lib64:$(dirname "$("$CXX" -print-file-name=libstdc++.so.6)")"
+common=(-G Ninja -DCMAKE_BUILD_TYPE=Release "-DCMAKE_INSTALL_PREFIX=$prefix"
+    "-DCMAKE_PREFIX_PATH=$prefix" "-DCMAKE_FIND_ROOT_PATH=$prefix;$sysroot"
+    -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY
+    -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=ONLY -DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF
+    -DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF -DCMAKE_INSTALL_LIBDIR=lib)
+cmake_build() {
+    local module=$1
+    shift
+    cmake -S "$work/src/$module" -B "$work/build-$module" "${common[@]}" "$@"
+    cmake --build "$work/build-$module" --parallel "$jobs"
+    cmake --install "$work/build-$module"
+}
+
+if [[ ! -e "$prefix/lib/libcrypto.a" ]]; then
+    (
+        cd "$work/src/openssl"
+        perl Configure linux-x86_64 no-shared no-tests --prefix="$prefix" \
+            --libdir=lib --openssldir=/etc/ssl -fPIC
+        make -j"$jobs"
+        make install_sw
+    )
+fi
+cmake_build zlib -DZLIB_BUILD_EXAMPLES=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+cmake_build qtbase -DQT_BUILD_EXAMPLES=OFF -DQT_BUILD_TESTS=OFF \
+    -DFEATURE_gui=OFF -DFEATURE_widgets=OFF -DFEATURE_dbus=OFF -DFEATURE_glib=OFF \
+    -DFEATURE_icu=OFF -DFEATURE_zstd=OFF -DFEATURE_system_zlib=ON \
+    -DFEATURE_openssl_linked=ON -DOPENSSL_ROOT_DIR="$prefix" -DOPENSSL_USE_STATIC_LIBS=TRUE \
+    -DFEATURE_sql_sqlite=ON -DFEATURE_system_sqlite=OFF
+cmake_build qttools -DQT_BUILD_EXAMPLES=OFF -DQT_BUILD_TESTS=OFF \
+    -DFEATURE_linguist=ON -DFEATURE_clang=OFF -DFEATURE_clangcpp=OFF
+cmake_build libtorrent -DBUILD_SHARED_LIBS=ON -Dbuild_tests=OFF -Dbuild_examples=OFF \
+    -Dbuild_tools=OFF -DBoost_NO_BOOST_CMAKE=ON -DBoost_NO_SYSTEM_PATHS=ON \
+    "-DBOOST_ROOT=$work/src/boost" "-DBoost_INCLUDE_DIR=$work/src/boost" \
+    "-DOPENSSL_ROOT_DIR=$prefix" -DOPENSSL_USE_STATIC_LIBS=TRUE
+cmake_build qbittorrent -DGUI=OFF -DWEBUI=ON -DSTACKTRACE=ON \
+    -DBoost_NO_BOOST_CMAKE=ON -DBoost_NO_SYSTEM_PATHS=ON \
+    "-DBOOST_ROOT=$work/src/boost" "-DBoost_INCLUDE_DIR=$work/src/boost" \
+    "-DOPENSSL_ROOT_DIR=$prefix" -DOPENSSL_USE_STATIC_LIBS=TRUE
+
+payload=$work/payload
+mkdir -p "$payload"/{bin,share/licenses,plugins/sqldrivers}
+install -m 755 "$prefix/bin/qbittorrent-nox" "$payload/bin/"
+"$CC" $CFLAGS -Wall -Wextra -Werror -I"$prefix/include" "$project/spk/service.c" \
+    "$prefix/lib/libcrypto.a" -pthread -ldl -o "$payload/bin/qbt-service"
+install -m 755 "$prefix/plugins/sqldrivers/libqsqlite.so" "$payload/plugins/sqldrivers/"
+printf '[Paths]\nPrefix=..\nPlugins=plugins\n' > "$payload/bin/qt.conf"
+install -m 644 "$project/sources.lock" "$payload/share/"
+cmp "$project/assets/qbittorrent.svg" "$work/src/qbittorrent/dist/unix/menuicons/scalable/apps/qbittorrent.svg"
+install -m 644 "$work/src/qbittorrent/COPYING" "$payload/share/licenses/qBittorrent"
+install -m 644 "$work/src/libtorrent/COPYING" "$payload/share/licenses/libtorrent"
+install -m 644 "$work/src/boost/LICENSE_1_0.txt" "$payload/share/licenses/Boost"
+install -m 644 "$work/src/openssl/LICENSE.txt" "$payload/share/licenses/OpenSSL"
+install -m 644 "$work/src/zlib/LICENSE" "$payload/share/licenses/zlib"
+install -m 644 "$work/src/gcc/COPYING.RUNTIME" "$payload/share/licenses/GCC-Runtime"
+for license in "$work/src/qtbase/LICENSES/"*; do
+    install -m 644 "$license" "$payload/share/licenses/Qt-${license##*/}"
+done
+python3 ci/elf.py "$payload" "$sysroot" "$prefix" \
+    "$(dirname "$("$CXX" -print-file-name=libstdc++.so.6)")" |
+    tee "$dist/ELF-dependencies.txt"
+bash ci/package "$payload" "$dist"
+sudo python3 ci/test.py "$dist" "$sysroot"

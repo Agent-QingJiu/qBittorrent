@@ -1,0 +1,58 @@
+#!/bin/sh
+set -eu
+PATH=/usr/syno/sbin:/usr/syno/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+target=/volume1/@appstore/qBittorrent
+parent=/volume1/@appdata
+store=$parent/qBittorrent-native
+marker=$store/.managed
+profile=$store/Profile
+config=$profile/qBittorrent/config/qBittorrent.conf
+logs=$store/Logs
+log=$logs/console.log
+pidfile=$store/service.pid
+account=qbittorrentspk
+app=$target/bin/qbittorrent-nox
+helper=$target/bin/qbt-service
+
+fail() {
+    printf '%s\n' "$*" >&2
+    if [ -n "${SYNOPKG_TEMP_LOGFILE:-}" ]; then
+        printf '%s\n' "$*" >> "$SYNOPKG_TEMP_LOGFILE"
+    fi
+    exit 1
+}
+
+check_target() {
+    [ "${SYNOPKG_PKGDEST:-$target}" = "$target" ] &&
+        [ ! -L "$target" ] && [ ! -L "$parent" ] ||
+        fail "请将套件安装到 volume1，并检查程序和持久化目录。"
+}
+
+managed_store() {
+    [ ! -L "$parent" ] && [ ! -L "$store" ] &&
+        [ -f "$marker" ] && [ ! -L "$marker" ] &&
+        [ "$(stat -c '%u:%a' "$store")" = 0:755 ] &&
+        [ "$(stat -c '%u:%a' "$marker")" = 0:600 ] &&
+        uid=$(id -u "$account" 2>/dev/null) &&
+        [ "$uid" -gt 0 ] && [ "$(cat "$marker")" = "$uid" ]
+}
+
+check_store() {
+    managed_store || fail "无法确认持久化目录及专用账号的归属，请检查 $store。"
+    for directory in "$profile" "$logs"; do
+        [ -d "$directory" ] && [ ! -L "$directory" ] &&
+            [ "$(stat -c '%u:%a' "$directory")" = "$uid:700" ] ||
+            fail "持久化目录的权限异常：$directory"
+    done
+    [ -f "$config" ] || fail "找不到已保存的配置：$config"
+}
+
+live_pid() {
+    [ -f "$pidfile" ] && [ ! -L "$pidfile" ] || return 1
+    IFS= read -r pid < "$pidfile" || return 1
+    case "$pid" in ''|*[!0-9]*|0|1) return 1 ;; esac
+    [ "$(readlink "/proc/$pid/exe" 2>/dev/null)" = "$app" ] &&
+        [ "$(awk '/^Uid:/ {print $3}' "/proc/$pid/status" 2>/dev/null)" = "$(id -u "$account")" ]
+}

@@ -1,0 +1,49 @@
+#!/bin/sh
+. "$(dirname "$0")/common"
+
+start() {
+    check_target
+    check_store
+    if live_pid; then
+        return
+    fi
+    umask 077
+    "$helper" run "$account" "$profile" "$log" "$app" </dev/null >/dev/null 2>&1 &
+    child=$!
+    printf '%s\n' "$child" > "$pidfile"
+    attempts=0
+    until live_pid; do
+        if ! kill -0 "$child" 2>/dev/null || [ "$attempts" -ge 15 ]; then
+            fail "启动失败，请查看 $log。"
+        fi
+        sleep 1
+        attempts=$((attempts + 1))
+    done
+    sleep 1
+    live_pid || fail "进程启动后退出，请查看 $log。"
+}
+
+stop() {
+    check_target
+    if live_pid; then
+        kill -TERM "$pid"
+        attempts=0
+        while live_pid; do
+            [ "$attempts" -lt 180 ] || fail "仍在保存任务并关闭，请稍后重试。"
+            sleep 1
+            attempts=$((attempts + 1))
+        done
+    fi
+    if managed_store; then
+        rm -f -- "$pidfile"
+    fi
+}
+
+case "${1:-}" in
+    start) start ;;
+    stop) stop ;;
+    restart) stop; start ;;
+    status) live_pid || exit 3 ;;
+    log) printf '%s\n' "$log" ;;
+    *) fail "请使用 DSM 套件中心管理 qBittorrent。" ;;
+esac

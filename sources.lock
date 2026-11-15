@@ -1,0 +1,10 @@
+# SHA256 文件名 官方归档链接
+8c57010a94f307d801b7dfb390c3def516717475e91bf783ce26d89ff32ed0d2 qb52.tar.gz https://codeload.github.com/qbittorrent/qBittorrent/tar.gz/a1e4649cb8ae581925acc161dbab5cbc6584c542
+f0db58580f4f29ade6cc40fa4ba80e2c9a70c90265cd77332d3cdec37ecf1e6d lt2.tar.gz https://github.com/arvidn/libtorrent/releases/download/v2.0.11/libtorrent-rasterbar-2.0.11.tar.gz
+cc4b893acf645c9d4b698e9a0f08ca8846aa5d6c68275c14c3e7949c24109454 boost.tar.bz2 https://archives.boost.io/release/1.84.0/source/boost_1_84_0.tar.bz2
+56001b905601bb9023d399f3ba780d7fa940f3e4861e496a7c490331f49e0b80 qt6base.tar.xz https://download.qt.io/archive/qt/6.8/6.8.3/submodules/qtbase-everywhere-src-6.8.3.tar.xz
+02a4e219248b94f1333df843d25763f35251c1074cdc4fb5bda67d340f8c8b3a qt6tools.tar.xz https://download.qt.io/archive/qt/6.8/6.8.3/submodules/qttools-everywhere-src-6.8.3.tar.xz
+a572efd967f99e2dc8228c46ba45410948d5b9a343f1e0271b9960298982866b ssl3.tar.gz https://codeload.github.com/openssl/openssl/tar.gz/refs/tags/openssl-3.5.6
+17e88863f3600672ab49182f217281b6fc4d3c762bde361935e436a95214d05c zlib.tar.gz https://codeload.github.com/madler/zlib/tar.gz/refs/tags/v1.3.1
+9c4ce6dbb040568fdc545588ac03c5cbc95a8dbf0c7aa490170843afb59ca8f5 gcc.tar.xz https://ftp.gnu.org/gnu/gcc/gcc-13.4.0/gcc-13.4.0.tar.xz
+b0bf4c1b2aaf8421cb6eeb1f1c66e0717cac89507dd96b2e9f9cf59a7cbd80ae env.txz https://global.download.synology.com/download/ToolChain/toolkit/6.2/bromolow/ds.bromolow-6.2.env.txz

@@ -1,0 +1,42 @@
+#!/bin/bash
+set -euo pipefail
+version=$(sed -n 's/^version="\([^"]*\)"$/\1/p' spk/INFO)
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[0-9]+$ ]]
+tag="v$version"
+spk="qBittorrent-$version-DSM6.2.3-bromolow.spk"
+digest=$(sha256sum "dist/$spk" | cut -d' ' -f1)
+[[ "$digest" == "$VERIFIED_SHA256" ]]
+[[ "$(cat dist/SHA256SUMS)" == "$digest  $spk" ]]
+test -s dist/ELF-dependencies.txt
+if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+    echo "版本 $tag 已存在。保留现有发布。"
+    exit 1
+fi
+tags=$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$tag")
+jq -e --arg ref "refs/tags/$tag" 'all(.[]; .ref != $ref)' <<< "$tags" >/dev/null
+notes=$(mktemp)
+trap 'rm -f "$notes"' EXIT
+base=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY
+cat > "$notes" <<NOTES
+## 下载与安装
+
+- 套件版本为 **$version**，适用于 DSM 6.2.3-25426、Bromolow（x86_64）。
+- [下载 SPK]($base/releases/download/$tag/$spk)
+- [下载 SHA256SUMS]($base/releases/download/$tag/SHA256SUMS)
+- SPK 的 SHA256 为 `$digest`。
+- 从套件中心选择「手动安装」，安装卷选择 volume1。已有安装可直接覆盖升级，程序替换期间会停止下载并保存任务。
+- [中文安装、升级及恢复说明]($base/blob/$SOURCE_SHA/README.md)
+- [构建与自动化测试记录]($base/actions/runs/$RUN_ID)
+
+NOTES
+cat release-notes.md >> "$notes"
+gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$SOURCE_SHA" --draft \
+    --title "qBittorrent $version 群晖原生套件" --notes-file "$notes" \
+    "dist/$spk" dist/SHA256SUMS dist/ELF-dependencies.txt
+for file in "$spk" SHA256SUMS ELF-dependencies.txt; do
+    expected=$(sha256sum "dist/$file" | cut -d' ' -f1)
+    actual=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets \
+        --jq ".assets[] | select(.name == \"$file\") | .digest")
+    [[ "$actual" == "sha256:$expected" ]]
+done
+gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --latest
