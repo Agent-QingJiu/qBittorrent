@@ -89,7 +89,7 @@ class TestTracker(BaseHTTPRequestHandler):
         if url.path != "/announce" or "info_hash" not in params:
             self.send_error(400)
             return
-        seeder = socket.inet_aton("127.0.0.1") + struct.pack("!H", 16881)
+        seeder = socket.inet_aton("127.0.0.2") + struct.pack("!H", 16881)
         peers = b"" if params.get("port") == ["16881"] else seeder
         body = bencode({b"interval": 5, b"complete": 1, b"incomplete": 0, b"peers": peers})
         self.send_response(200)
@@ -184,7 +184,8 @@ with tempfile.TemporaryDirectory(prefix="qb-dsm-test-") as temporary:
             inside(path).mkdir()
             os.chown(inside(path), 19081, 100)
         client.preferences(save_path=paths[0], temp_path=paths[1], temp_path_enabled=True,
-                           dht=False, pex=False, lsd=False, upnp=False)
+                           dht=False, pex=False, lsd=False, upnp=False,
+                           current_interface_address="127.0.0.1")
         prefs = json.loads(client.request("/api/v2/app/preferences"))
         assert prefs["save_path"].rstrip("/") == paths[0]
         assert prefs["temp_path"].rstrip("/") == paths[1] and prefs["temp_path_enabled"]
@@ -202,7 +203,7 @@ with tempfile.TemporaryDirectory(prefix="qb-dsm-test-") as temporary:
         wait_for(lambda: seed.request("/"))
         seed.login(password)
         seed.preferences(dht=False, pex=False, lsd=False, upnp=False, temp_path_enabled=False,
-                         save_path=paths[3])
+                         save_path=paths[3], current_interface_address="127.0.0.2")
 
         def create_torrent(name, data):
             filename = name.encode()
@@ -229,7 +230,7 @@ with tempfile.TemporaryDirectory(prefix="qb-dsm-test-") as temporary:
                        {"torrents": torrent})
         wait_for(lambda: client.torrents().get(torrent_hash, {}).get("state") == "stoppedDL")
         client.request("/api/v2/torrents/start", {"hashes": torrent_hash})
-        client.request("/api/v2/torrents/addPeers", {"hashes": torrent_hash, "peers": "127.0.0.1:16881"})
+        client.request("/api/v2/torrents/addPeers", {"hashes": torrent_hash, "peers": "127.0.0.2:16881"})
         wait_for(lambda: client.torrents().get(torrent_hash, {}).get("progress") == 1)
         assert (inside(paths[2]) / "校验 文件.bin").read_bytes() == content
 
@@ -239,7 +240,10 @@ with tempfile.TemporaryDirectory(prefix="qb-dsm-test-") as temporary:
         Thread(target=tracker.serve_forever, daemon=True).start()
         tracker_url = f"http://127.0.0.1:{tracker.server_port}/announce"
         magnet = f"magnet:?xt=urn:btih:{magnet_hash}&" + urllib.parse.urlencode({"tr": tracker_url})
-        client.request("/api/v2/torrents/add", {"urls": magnet, "autoTMM": "false", "stopped": "false"})
+        client.request("/api/v2/torrents/add", {"urls": magnet, "autoTMM": "false",
+                                                         "stopped": "false", "forced": "true"})
+        wait_for(lambda: magnet_hash in client.torrents())
+        seed.request("/api/v2/torrents/addPeers", {"hashes": magnet_hash, "peers": "127.0.0.1:6881"})
         try:
             wait_for(lambda: client.torrents().get(magnet_hash, {}).get("progress") == 1)
         except AssertionError:
